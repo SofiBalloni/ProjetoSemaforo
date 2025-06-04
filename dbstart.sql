@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS HistoricoSensores (
     zonas TEXT,
     alagado BOOLEAN,
     PRIMARY KEY (sensorid, epoch),
-    FOREIGN KEY (sensorid) REFERENCES Sensores(sensorid)
 );
 
 CREATE TABLE IF NOT EXISTS HistoricoZonas (
@@ -12,5 +11,4 @@ CREATE TABLE IF NOT EXISTS HistoricoZonas (
     zonaid INTEGER,
     alagada BOOLEAN,
     PRIMARY KEY (zonaid, epoch),
-    FOREIGN KEY (zonaid) REFERENCES Zonas(zonaid)
 );
