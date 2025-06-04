@@ -6,12 +6,11 @@ class AlagometrosDB extends Database{
     }
 }
 
-const db = new AlagometrosDB("data.db");
+const db = new AlagometrosDB("historico.db");
 
 db.exec(await Bun.file("dbstart.sql").text())
 
-Bun.serve({
-  routes: {
+Bun.serve({port:4000,routes: {
     "/sensor/atualizar":{
       POST: async req => {
         let sensor = <Sensor>await req.json();
@@ -24,7 +23,7 @@ Bun.serve({
 
     "/sensor/listar": {
       GET: () => {
-        let sensores = <DBSensor[]>db.query("SELECT * HistoricoSensores ORDER BY epoch DESC LIMIT 1").all();
+        let sensores = <DBSensor[]>db.query("SELECT * FROM HistoricoSensores ORDER BY epoch DESC").all();
         let sensoresIdentificados = new Set<number>();
         let sensoresFiltrados = sensores.filter((sensor)=>{
           if (sensoresIdentificados.has(sensor.sensorid)){
@@ -33,35 +32,31 @@ Bun.serve({
             sensoresIdentificados.add(sensor.sensorid)
             return true
           }
-        })
-        let listaSensores: Sensor[] = []
-        sensoresFiltrados.forEach(sensor=>{
-          listaSensores.push(DBSensorToSensor(sensor))
-        })
-        return Response.json(sensores);
+        })        
+        return Response.json(sensoresFiltrados.map(DBSensorToEpochSensor));
       }
     },
     "/sensor/:id": {
       GET: req => {
-        let sensor = <DBSensor>db.query("SELECT * FROM HistoricoSensores WHERE sensorid = ? ORDER BY epoch DESC LIMIT 1").get(req.params.id);
+        let sensor = <DBSensor>db.query("SELECT * FROM HistoricoSensores WHERE sensorid = ? ORDER BY epoch DESC LIMIT 1").get(parseInt(req.params.id));
         if (!sensor) {
           return new Response("Não Encontrado", { status: 404 });
         }
-        return Response.json(sensor);
+        return Response.json(DBSensorToEpochSensor(sensor));
       }
     },
     "/zona/listar": {
       GET: () => {
-        let zonas = <EpochSensor[]>db.query("SELECT * HistoricoZonas ORDER BY epoch DESC LIMIT 1").all();
+        let zonas = <DBZona[]>db.query("SELECT * FROM HistoricoZonas ORDER BY epoch DESC LIMIT 1").all();
         let zonaIdentificada = new Set<number>();
         return Response.json(zonas.filter((zona)=>{
-          if (zonaIdentificada.has(zona.sensorid)){
+          if (zonaIdentificada.has(zona.zonaid)){
             return false
           } else {
-            zonaIdentificada.add(zona.sensorid)
+            zonaIdentificada.add(zona.zonaid)
             return true
           }
-        }));
+        }).map(DBZonaToEpochZona));
       }
     },
     "/zona/atualizar":{
@@ -81,21 +76,53 @@ Bun.serve({
         }
         return Response.json(zona);
       },
+    },
+    "/var/:var": {
+      GET: req => {
+        const globalvar = <GlobalVar>db.query("SELECT * FROM GlobalVars WHERE varname = ? ORDER BY epoch DESC LIMIT 1").get(req.params.var);
+        if (!globalvar) {
+          return Response.json(null,{status:203})
+        } else {
+          return Response.json(JSON.parse(globalvar.varval),{status:203});
+        }
+      },
+      PUT: async req => {
+        const globalvar = <GlobalVar>db.query("SELECT * FROM GlobalVars WHERE varname = ? ORDER BY epoch DESC LIMIT 1").get(req.params.var);
+        if (!globalvar) {
+          db.query("INSERT INTO GlobalVars (varname, varval) VALUES (?, ?)").run(req.params.var,JSON.stringify(await req.json()))
+          return Response.json({status:201})
+        } else {
+          db.query("UPDATE GlobalVars SET varval = ? WHERE varname = ?").run(req.params.var,JSON.stringify(await req.json()))
+          return Response.json({status:200});
+        }
+      },
+      DELETE: req => {
+        db.query("DELETE GlobalVars WHERE uma vez FLAMENGO sempre FLAMENGO")
+        return Response.json({status:203});
+      }
     }
   },
-
   error(error) {
     console.error(error);
     return new Response("Internal Server Error", { status: 500 });
-  },
+  }
 });
 
-function DBSensorToSensor(dbsensor:DBSensor):Sensor{
-
+function DBSensorToEpochSensor(dbsensor:DBSensor):EpochSensor{
+  return {
+    "sensorid":dbsensor.sensorid,
+    "zonas": dbsensor.zonas.split(" ").map(n=>parseInt(n)),
+    "alagado": dbsensor.alagado==1?true:false,
+    "epoch": dbsensor.epoch
+  }
 }
 
-function DBZonaToZona(dbsensor:DBSensor):Sensor{
-
+function DBZonaToEpochZona(dbzona:DBZona):EpochZona{
+  return {
+    "zonaid": dbzona.zonaid,
+    "alagada": dbzona.alagada==1?true:false,
+    "epoch": dbzona.epoch
+  }
 }
 
 interface Sensor {
@@ -105,7 +132,7 @@ interface Sensor {
 }
 
 interface EpochSensor extends Sensor{
-    epoch?: number
+    epoch: number
 }
 
 interface DBSensor {
@@ -123,4 +150,14 @@ interface Zona {
 interface EpochZona extends Zona{
     epoch: number
 }
-db.query("").get()
+
+interface DBZona {
+  zonaid: number,
+  alagada: number,
+  epoch: number
+}
+
+interface GlobalVar {
+  varname: string,
+  varval: string
+}
