@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mapa de Áreas Alagadas - Rio Claro</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background-color: black;
+        color: white;
+        font-family: "Poppins", Arial, sans-serif;
+        transition: background-color 0.3s, color 0.3s;
+      }
+
+      .faixa-topo {
+        background-color: #555;
+        height: 120px;
+        padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .faixa-topo img {
+        max-height: 150%;
+        margin-left: 20px;
+        transform: rotate(90deg);
+        transform-origin: center;
+      }
+
+      .modo-btn {
+        font-size: 28px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: white;
+        transition: color 0.3s;
+      }
+
+      h1 {
+        text-align: center;
+        font-size: 38px;
+        margin: 30px 15px 20px;
+        font-weight: bold;
+      }
+
+      .botoes {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        padding: 0 10px;
+        margin-bottom: 30px;
+      }
+
+      .botoes button {
+        padding: 15px 30px;
+        font-size: 20px;
+        font-weight: bold;
+        color: white;
+        background-color: rgb(95, 174, 39);
+        border-radius: 30px;
+        border: 3px solid #222;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        transition: transform 0.2s ease, background-color 0.3s ease;
+      }
+
+      .botoes button:hover {
+        transform: scale(1.05);
+        background-color: red;
+      }
+
+      #map {
+        width: 95%;
+        max-width: 1000px;
+        height: 500px;
+        border: 4px solid #444;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        margin: 0 auto 40px;
+      }
+
+      /* Modo claro */
+      body.light-mode {
+        background-color: #f0f0f0;
+        color: #000;
+      }
+
+      body.light-mode .modo-btn {
+        color: #000;
+      }
+
+      body.light-mode .faixa-topo {
+        background-color: #dcdcdc;
+      }
+
+      body.light-mode .botoes button {
+        background-color: #69c94f;
+        color: #000;
+        border-color: #aaa;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      body.light-mode .botoes button:hover {
+        background-color: #ff6666;
+      }
+
+      body.light-mode #map {
+        border-color: #aaa;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Responsividade */
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 28px;
+        }
+
+        .modo-btn {
+          font-size: 24px;
+        }
+
+        .faixa-topo {
+          flex-direction: row;
+          justify-content: space-between;
+        }
+
+        .faixa-topo img {
+          height: 50px;
+        }
+
+        .botoes button {
+          width: 100%;
+          max-width: 300px;
+        }
+
+        #map {
+          height: 400px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 24px;
+        }
+
+        .modo-btn {
+          font-size: 22px;
+        }
+
+        .faixa-topo {
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .botoes {
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        #map {
+          height: 300px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="faixa-topo">
+      <img src="semaforo-Photoroom.png" alt="Semáforo" />
+      <button class="modo-btn" onclick="alternarModo()" title="Alterar modo">
+        🌙
+      </button>
+    </div>
+
+    <h1>Mapa de Áreas Alagadas - Rio Claro</h1>
+
+    <div class="botoes">
+      <button class="tipo" onclick="window.location.href='Home.html'">
+        Home
+      </button>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+      var map = L.map("map").setView([-22.4051, -47.5619], 13);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      var urlAPI = "dados.json";
+
+      function adicionarPontos(pontos) {
+        pontos.forEach(function (ponto) {
+          L.marker([ponto.lat, ponto.lng])
+            .addTo(map)
+            .bindPopup(ponto.descricao);
+        });
+      }
+
+      function adicionarAreas(areas) {
+        areas.forEach(function (area) {
+          L.polygon(area.coords, {
+            color: "blue",
+            fillColor: "#3399ff",
+            fillOpacity: 0.5,
+          })
+            .addTo(map)
+            .bindPopup(area.nome);
+        });
+      }
+
+      fetch(urlAPI)
+        .then((response) => {
+          if (!response.ok) throw new Error("Erro na resposta da API");
+          return response.json();
+        })
+        .then((data) => {
+          adicionarPontos(data.pontos || []);
+          adicionarAreas(data.areas || []);
+        })
+        .catch((error) => {
+          console.error("Erro ao carregar dados da API:", error);
+          alert("Não foi possível carregar os dados de alagamento.");
+        });
+
+      function alternarModo() {
+        const body = document.body;
+        const btn = document.querySelector(".modo-btn");
+        body.classList.toggle("light-mode");
+        btn.textContent = body.classList.contains("light-mode") ? "☀️" : "🌙";
+      }
+    </script>
+  </body>
+</html>

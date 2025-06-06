@@ -1,0 +1,17 @@
+{
+  "pontos": [
+    { "lat": -22.4051, "lng": -47.5619, "descricao": "Alagamento no Centro" },
+    { "lat": -22.4100, "lng": -47.5700, "descricao": "Alagamento na Av. Brasil" }
+  ],
+  "areas": [
+    {
+      "nome": "Área alagada no Parque Cidade",
+      "coords": [
+        [-22.407, -47.562],
+        [-22.408, -47.558],
+        [-22.410, -47.559],
+        [-22.409, -47.563]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Semáforo Inteligente</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background-color: black;
+        font-family: "Poppins", sans-serif;
+        color: white;
+        transition: background-color 0.3s, color 0.3s;
+      }
+
+      .faixa-topo {
+        background-color: #555;
+        height: 120px;
+        padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .faixa-topo img {
+        max-height: 150%;
+        margin-left: 20px;
+        transform: rotate(90deg);
+        transform-origin: center;
+      }
+
+      .modo-btn {
+        font-size: 32px;
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        margin-right: 20px;
+      }
+
+      .titulo {
+        text-align: center;
+        padding: 50px 10px 30px;
+      }
+
+      .titulo h1 {
+        font-size: 72px;
+        font-weight: 800;
+        letter-spacing: 2px;
+      }
+
+      .titulo h2 {
+        font-size: 32px;
+        font-weight: 400;
+        font-style: italic;
+        margin-top: 10px;
+        opacity: 0.9;
+      }
+
+      .botoes {
+        display: flex;
+        justify-content: center;
+        margin: 20px 0 60px;
+      }
+
+      .botoes button {
+        width: 280px;
+        height: 72px;
+        font-size: 26px;
+        font-weight: bold;
+        color: white;
+        border-radius: 30px;
+        border: 3px solid #222;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        background-color: rgb(95, 174, 39);
+        transition: transform 0.2s ease, background-color 0.3s ease;
+      }
+
+      .botoes button:hover {
+        background-color: red;
+        transform: scale(1.05);
+      }
+
+      .carrossel {
+        background-color: #444;
+        padding: 40px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        height: 390px;
+      }
+
+      .seta {
+        font-size: 48px;
+        color: black;
+        background-color: white;
+        border-radius: 50%;
+        width: 70px;
+        height: 70px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+        transition: 0.2s;
+      }
+
+      .seta:hover {
+        background-color: #ddd;
+        transform: scale(1.1);
+      }
+
+      .carrossel-container {
+        max-width: 1320px;
+        overflow: hidden;
+        border-radius: 12px;
+        height: 300px;
+        display: flex;
+        align-items: center;
+      }
+
+      .carrossel-imagens {
+        display: flex;
+        transition: transform 0.5s ease-in-out;
+      }
+
+      .carrossel-imagens img {
+        width: 320px;
+        height: 280px;
+        object-fit: cover;
+        flex-shrink: 0;
+        border-radius: 16px;
+        margin-right: 24px;
+      }
+
+      .carrossel-imagens img:last-child {
+        margin-right: 0;
+      }
+
+      /* Modo Claro */
+      body.light-mode {
+        background-color: #f0f0f0;
+        color: black;
+      }
+
+      body.light-mode .modo-btn {
+        color: black;
+      }
+
+      body.light-mode .faixa-topo {
+        background-color: #dcdcdc;
+      }
+
+      body.light-mode .carrossel {
+        background-color: #e4e4e4;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="faixa-topo">
+      <img src="semaforo-Photoroom.png" alt="Semáforo" />
+      <button class="modo-btn" onclick="alternarModo()" title="Alterar modo">
+        🌙
+      </button>
+    </div>
+
+    <div class="titulo">
+      <h1>SEMÁFORO</h1>
+      <h2>INTELIGENTE</h2>
+    </div>
+
+    <div class="botoes">
+      <button onclick="window.location.href='mapa.html'">
+        Mapa de Alagamento
+      </button>
+    </div>
+
+    <div class="carrossel">
+      <div class="seta" onclick="mudarImagem(-1)">&#10094;</div>
+      <div class="carrossel-container">
+        <div class="carrossel-imagens" id="imagens">
+          <img src="rio-claro.jpg" alt="Cidade 1" />
+          <img src="Imagemrioclaro.jpg" alt="Cidade 2" />
+          <img
+            src="WhatsApp Image 2025-05-27 at 08.02.37 (1).jpeg"
+            alt="Cidade 3"
+          />
+          <img
+            src="WhatsApp Image 2025-05-27 at 08.02.37.jpeg"
+            alt="Cidade 4"
+          />
+          <img src="download (1).jpg" alt="Cidade 5" />
+          <img src="download (2).jpg" alt="Cidade 6" />
+          <img src="download (3).jpg" alt="Cidade 7" />
+          <img src="download.jpg" alt="Cidade 8" />
+        </div>
+      </div>
+      <div class="seta" onclick="mudarImagem(1)">&#10095;</div>
+    </div>
+
+    <script>
+      const imagens = document.getElementById("imagens");
+      const totalImgs = imagens.children.length;
+      const imagensPorPagina = 4;
+      const larguraImagem = 320 + 24; // largura + margem
+      let paginaAtual = 0;
+
+      function mudarImagem(direcao) {
+        const totalPaginas = Math.ceil(totalImgs / imagensPorPagina);
+        paginaAtual += direcao;
+        if (paginaAtual < 0) paginaAtual = totalPaginas - 1;
+        if (paginaAtual >= totalPaginas) paginaAtual = 0;
+        imagens.style.transform = `translateX(-${
+          paginaAtual * imagensPorPagina * larguraImagem
+        }px)`;
+      }
+
+      function alternarModo() {
+        const body = document.body;
+        const btn = document.querySelector(".modo-btn");
+        body.classList.toggle("light-mode");
+        btn.textContent = body.classList.contains("light-mode") ? "☀️" : "🌙";
+      }
+    </script>
+  </body>
+</html>
