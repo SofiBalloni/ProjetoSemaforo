@@ -4,7 +4,7 @@
     "": {
       "name": "api-rest",
       "devDependencies": {
-        "@types/bun": "latest",
+        "@types/bun": "^1.2.15",
       },
       "peerDependencies": {
         "typescript": "^5",

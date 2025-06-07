@@ -1,6 +1,9 @@
 {
   "name": "api-rest",
   "private": true,
+  "scripts": {
+    "main": "bun run main.ts"
+  },
   "peerDependencies": {
     "typescript": "^5"
   },

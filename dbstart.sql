@@ -1,10 +1,10 @@
 CREATE TABLE IF NOT EXISTS HistoricoSensores (
     epoch BIGINT,
     sensorid INTEGER,
-    humindade INTEGER,
+    humidade INTEGER,
     temperatura INTEGER,
-    zonas TEXT,
     alagado BOOLEAN,
+    zonas TEXT,
     PRIMARY KEY (sensorid, epoch)
 );
 
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS HistoricoZonas (
 );
 
 CREATE TABLE IF NOT EXISTS GlobalVars (
-    varname BIGINT,
+    varname TEXT,
     varval TEXT,
     PRIMARY KEY (varname)
 );
