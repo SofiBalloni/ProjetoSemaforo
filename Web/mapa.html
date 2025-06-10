@@ -206,25 +206,101 @@
         attribution: "&copy; OpenStreetMap contributors",
       }).addTo(map);
 
-      var urlAPI = "dados.json";
+      // Caminho da API ou arquivo local JSON
+      var urlAPI = "dados.json"; // Ex: [{ "lat": -22.4, "lng": -47.56, "descricao": "Alagamento X" }]
+
+      // Criar div para informações detalhadas
+      var infoBox = document.createElement("div");
+      infoBox.id = "info-box";
+      infoBox.style.display = "none";
+      infoBox.style.position = "absolute";
+      infoBox.style.bottom = "20px";
+      infoBox.style.left = "20px";
+      infoBox.style.zIndex = "1000";
+      infoBox.style.backgroundColor = "white";
+      infoBox.style.padding = "10px";
+      infoBox.style.borderRadius = "5px";
+      infoBox.style.boxShadow = "0 0 10px rgba(0,0,0,0.2)";
+      infoBox.style.maxWidth = "300px";
+      document.body.appendChild(infoBox);
+
+      function mostrarInfoBox(conteudo) {
+        infoBox.innerHTML = conteudo;
+        infoBox.style.display = "block";
+      }
+
+      function esconderInfoBox() {
+        infoBox.style.display = "none";
+      }
 
       function adicionarPontos(pontos) {
-        pontos.forEach(function (ponto) {
-          L.marker([ponto.lat, ponto.lng])
-            .addTo(map)
-            .bindPopup(ponto.descricao);
+        if (!Array.isArray(pontos)) return;
+
+        pontos.forEach((ponto) => {
+          if (ponto.lat && ponto.lng && ponto.descricao) {
+            const marker = L.marker([ponto.lat, ponto.lng]).addTo(map);
+
+            // Adicionar popup padrão
+            marker.bindPopup(
+              `<strong>Alagamento</strong><br>${ponto.descricao}`
+            );
+
+            // Adicionar evento de clique para mostrar a caixa de informações
+            marker.on("click", function () {
+              const infoContent = `
+            <h3>Informações de Alagamento</h3>
+            <p><strong>Localização:</strong> ${ponto.lat}, ${ponto.lng}</p>
+            <p><strong>Descrição:</strong> ${ponto.descricao}</p>
+            ${
+              ponto.nivel ? `<p><strong>Nível:</strong> ${ponto.nivel}</p>` : ""
+            }
+            ${ponto.data ? `<p><strong>Data:</strong> ${ponto.data}</p>` : ""}
+            <button onclick="esconderInfoBox()" style="margin-top: 10px;">Fechar</button>
+          `;
+              mostrarInfoBox(infoContent);
+            });
+          } else {
+            console.warn("Ponto inválido:", ponto);
+          }
         });
       }
 
       function adicionarAreas(areas) {
-        areas.forEach(function (area) {
-          L.polygon(area.coords, {
-            color: "blue",
-            fillColor: "#3399ff",
-            fillOpacity: 0.5,
-          })
-            .addTo(map)
-            .bindPopup(area.nome);
+        if (!Array.isArray(areas)) return;
+
+        areas.forEach((area) => {
+          if (Array.isArray(area.coords) && area.nome) {
+            const polygon = L.polygon(area.coords, {
+              color: "blue",
+              fillColor: "#3399ff",
+              fillOpacity: 0.5,
+            }).addTo(map);
+
+            // Adicionar popup padrão
+            polygon.bindPopup(`<strong>${area.nome}</strong>`);
+
+            // Adicionar evento de clique para mostrar a caixa de informações
+            polygon.on("click", function () {
+              const infoContent = `
+            <h3>Informações de Área Alagada</h3>
+            <p><strong>Nome:</strong> ${area.nome}</p>
+            ${
+              area.descricao
+                ? `<p><strong>Descrição:</strong> ${area.descricao}</p>`
+                : ""
+            }
+            ${
+              area.risco
+                ? `<p><strong>Nível de Risco:</strong> ${area.risco}</p>`
+                : ""
+            }
+            <button onclick="esconderInfoBox()" style="margin-top: 10px;">Fechar</button>
+          `;
+              mostrarInfoBox(infoContent);
+            });
+          } else {
+            console.warn("Área inválida:", area);
+          }
         });
       }
 
@@ -249,5 +325,25 @@
         btn.textContent = body.classList.contains("light-mode") ? "☀️" : "🌙";
       }
     </script>
+
+    <style>
+      #info-box h3 {
+        margin-top: 0;
+        color: #333;
+      }
+
+      #info-box button {
+        background-color: #0078a8;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      #info-box button:hover {
+        background-color: #005f87;
+      }
+    </style>
   </body>
 </html>
