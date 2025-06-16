@@ -7,42 +7,35 @@
 #define USAR_SEMAFORO
 
 // ================== NOVOS PARÂMETROS DE CONTROLE ==================
-// Simulação dos dados de alagamento (mude para 'true' para testar)
-bool alagamentoNorte = true;
-bool alagamentoSul = false;
+// --- NOVO: CONTROLE DE SENTIDO DA VIA ---
+int sentidoDaVia = 1; // 1: S->N, L->O; 2: N->S, L->O; 3: S->N, O->L; 4: N->S, O->L
+
+// Simulação dos dados de alagamento
+bool alagamentoNorte = false;
+bool alagamentoSul = true;
 bool alagamentoLeste = false;
 bool alagamentoOeste = false;
-bool alagamentoLocal = false; // Sensor no próprio cruzamento
+bool alagamentoLocal = false;
 
 // Identifica o plano de ação do semáforo
-enum PlanoDeAcao {
-  NORMAL,
-  REDIRECIONAR_ESQUERDA,
-  REDIRECIONAR_DIREITA,
-  PISTA_LIVRE, // Via cruzada está bloqueada, nossa via tem preferência
-  PISTA_BLOQUEADA // Nossa própria via está bloqueada
-};
+enum PlanoDeAcao { NORMAL, REDIRECIONAR_ESQUERDA, REDIRECIONAR_DIREITA, PISTA_LIVRE, PISTA_BLOQUEADA };
 PlanoDeAcao planoAtual = NORMAL;
 
 // Estados para o ciclo de tempo (Verde, Amarelo, Vermelho)
-enum EstadoCiclo {
-  CICLO_VERDE,
-  CICLO_AMARELO,
-  CICLO_VERMELHO
-};
+enum EstadoCiclo { CICLO_VERDE, CICLO_AMARELO, CICLO_VERMELHO };
 EstadoCiclo estadoCicloAtual = CICLO_VERDE;
 
 // Controle de tempo para o ciclo (em milissegundos)
 unsigned long tempoTrocaEstado = 0;
-const long TEMPO_VERDE = 15000;    // 15 segundos
-const long TEMPO_AMARELO = 5000;   // 5 segundos
-const long TEMPO_VERMELHO = 20000; // 20 segundos
+const long TEMPO_VERDE = 15000;
+const long TEMPO_AMARELO = 5000;
+const long TEMPO_VERMELHO = 20000;
 // ===================================================================
 
 // Pinos e Variáveis
 Adafruit_AHTX0 aht;
 const int pinoSensorAgua = A0;
-int modoAtual = 10; // Inicia no modo verde normal (caso 10)
+int modoAtual = 10;
 int id = 1;
 int chovendo = 0;
 float temperatura = 0.0;
@@ -75,7 +68,7 @@ void setup() {
   #ifdef USAR_SEMAFORO
     semaforo_setup();
   #endif
-  tempoTrocaEstado = millis(); // Inicia o contador de tempo do semáforo
+  tempoTrocaEstado = millis();
 }
 
 // Função Principal de Loop
@@ -98,7 +91,6 @@ void sensor_setup() {
   }
   Serial.println("Sensores prontos.");
 }
-
 void sensor_loop() {
   if (millis() - tempoLeituraSensor >= intervaloLeituraSensor) {
     tempoLeituraSensor = millis();
@@ -121,13 +113,11 @@ void desenharMatriz(LedControl &lc, const byte pattern[8]) {
     lc.setRow(0, i, pattern[i]);
   }
 }
-
 void exibirPadraoContinuo(const byte m1[8], const byte m2[8], const byte m3[8]) {
   desenharMatriz(semaforo_lc1, m1);
   desenharMatriz(semaforo_lc2, m2);
   desenharMatriz(semaforo_lc3, m3);
 }
-
 void semaforo_setup() {
   semaforo_lc1.shutdown(0, false);
   semaforo_lc1.setIntensity(0, 8);
@@ -141,92 +131,127 @@ void semaforo_setup() {
   Serial.println("Semáforos (3 matrizes) inicializados com lógica inteligente.");
 }
 
-// ================== LÓGICA INTELIGENTE DO SEMÁFORO ==================
+// ================== LÓGICA INTELIGENTE DO SEMÁFORO (VERSÃO FINAL CORRIGIDA) ==================
 void definirPlanoDeAcao() {
+  // PRIORIDADE 1: VERIFICA BLOQUEIOS TOTAIS QUE IMPEDEM QUALQUER FLUXO
   if (alagamentoLocal || (alagamentoNorte && alagamentoSul)) {
-    planoAtual = PISTA_BLOQUEADA; return;
+    planoAtual = PISTA_BLOQUEADA;
+    return;
   }
+
+  // PRIORIDADE 2: ANALISA O FLUXO DA VIA PRINCIPAL E REDIRECIONAMENTOS VÁLIDOS
+  switch (sentidoDaVia) {
+    
+    case 1: // Via Principal: Sul -> Norte / Cruzamento: Leste -> Oeste
+      // Se o caminho à frente (Norte) está bloqueado, só podemos virar à ESQUERDA para entrar no fluxo L->O.
+      if (alagamentoNorte) {
+        // A via de destino (Oeste) está livre?
+        if (!alagamentoOeste) {
+          planoAtual = REDIRECIONAR_ESQUERDA;
+        } else { // Se não há para onde ir...
+          planoAtual = PISTA_BLOQUEADA;
+        }
+        return; // Decisão tomada.
+      }
+      break;
+
+    case 2: // Via Principal: Norte -> Sul / Cruzamento: Leste -> Oeste
+      // Se o caminho à frente (Sul) está bloqueado, só podemos virar à DIREITA para entrar no fluxo L->O.
+      if (alagamentoSul) {
+        // A via de destino (Oeste) está livre?
+        if (!alagamentoOeste) {
+          planoAtual = REDIRECIONAR_DIREITA;
+        } else {
+          planoAtual = PISTA_BLOQUEADA;
+        }
+        return; // Decisão tomada.
+      }
+      break;
+
+    case 3: // Via Principal: Sul -> Norte / Cruzamento: Oeste -> Leste
+      // Se o caminho à frente (Norte) está bloqueado, só podemos virar à DIREITA para entrar no fluxo O->L.
+      if (alagamentoNorte) {
+        // A via de destino (Leste) está livre?
+        if (!alagamentoLeste) {
+          planoAtual = REDIRECIONAR_DIREITA;
+        } else {
+          planoAtual = PISTA_BLOQUEADA;
+        }
+        return; // Decisão tomada.
+      }
+      break;
+
+    case 4: // Via Principal: Norte -> Sul / Cruzamento: Oeste -> Leste
+      // Se o caminho à frente (Sul) está bloqueado, só podemos virar à ESQUERDA para entrar no fluxo O->L.
+      if (alagamentoSul) {
+        // A via de destino (Leste) está livre?
+        if (!alagamentoLeste) {
+          planoAtual = REDIRECIONAR_ESQUERDA;
+        } else {
+          planoAtual = PISTA_BLOQUEADA;
+        }
+        return; // Decisão tomada.
+      }
+      break;
+  }
+
+  // PRIORIDADE 3: SE A VIA PRINCIPAL ESTÁ LIVRE, VERIFICA A TRANSVERSAL
+  // Se a via transversal inteira está bloqueada, temos preferência.
   if (alagamentoLeste && alagamentoOeste) {
-    planoAtual = PISTA_LIVRE; return;
+    planoAtual = PISTA_LIVRE;
+    return;
   }
-  if (alagamentoNorte) {
-    planoAtual = REDIRECIONAR_ESQUERDA; return;
-  }
-  if (alagamentoSul) {
-     planoAtual = REDIRECIONAR_DIREITA; return;
-  }
+
+  // PRIORIDADE 4: SE NADA DISSO OCORREU, OPERAÇÃO NORMAL
   planoAtual = NORMAL;
 }
 
+
+// A função executarCicloDeTempo permanece a mesma
 void executarCicloDeTempo() {
     unsigned long tempoAtual = millis();
-    long tempoLimite = TEMPO_VERDE;
     int casoVerde, casoAmarelo, casoVermelho;
 
     switch (planoAtual) {
         case NORMAL:
-            // COMPORTAMENTO DE SEMÁFORO COMUM
-            casoVerde = 10;   // Matriz 3 toda acesa (VERDE)
-            casoAmarelo = 9;  // Matriz 2 toda acesa (AMARELO)
-            casoVermelho = 8; // Matriz 1 toda acesa (VERMELHO)
+            casoVerde = 10; casoAmarelo = 9; casoVermelho = 8;
             break;
         case REDIRECIONAR_ESQUERDA:
-            // Comportamento de redirecionamento para a esquerda
-            casoVerde = 6;    // Seta esquerda na matriz 3
-            casoAmarelo = 1;  // Alerta no centro
-            casoVermelho = 4; // Seta esquerda na matriz 1
+            casoVerde = 6; casoAmarelo = 1; casoVermelho = 4;
             break;
         case REDIRECIONAR_DIREITA:
-            // Comportamento de redirecionamento para a direita
-            casoVerde = 7;    // Seta direita na matriz 3
-            casoAmarelo = 1;  // Alerta no centro
-            casoVermelho = 3; // Seta direita na matriz 1
+            casoVerde = 7; casoAmarelo = 1; casoVermelho = 3;
             break;
         case PISTA_LIVRE:
-            // No modo de pista livre, usamos seta para cima constante
             modoAtual = 5; 
             return; 
         case PISTA_BLOQUEADA:
-            // No modo de pista bloqueada, usamos alerta constante
             modoAtual = 1; 
             return;
     }
 
-    // Máquina de estados do ciclo de tempo
     switch (estadoCicloAtual) {
         case CICLO_VERDE:
             modoAtual = casoVerde;
-            if (tempoAtual - tempoTrocaEstado >= TEMPO_VERDE) {
-                estadoCicloAtual = CICLO_AMARELO;
-                tempoTrocaEstado = tempoAtual;
-            }
+            if (tempoAtual - tempoTrocaEstado >= TEMPO_VERDE) { estadoCicloAtual = CICLO_AMARELO; tempoTrocaEstado = tempoAtual; }
             break;
         case CICLO_AMARELO:
             modoAtual = casoAmarelo;
-            if (tempoAtual - tempoTrocaEstado >= TEMPO_AMARELO) {
-                estadoCicloAtual = CICLO_VERMELHO;
-                tempoTrocaEstado = tempoAtual;
-            }
+            if (tempoAtual - tempoTrocaEstado >= TEMPO_AMARELO) { estadoCicloAtual = CICLO_VERMELHO; tempoTrocaEstado = tempoAtual; }
             break;
         case CICLO_VERMELHO:
             modoAtual = casoVermelho;
-            if (tempoAtual - tempoTrocaEstado >= TEMPO_VERMELHO) {
-                estadoCicloAtual = CICLO_VERDE;
-                tempoTrocaEstado = tempoAtual;
-            }
+            if (tempoAtual - tempoTrocaEstado >= TEMPO_VERMELHO) { estadoCicloAtual = CICLO_VERDE; tempoTrocaEstado = tempoAtual; }
             break;
     }
 }
 
+// A função semaforo_loop permanece a mesma
 void semaforo_loop() {
-  // --- LÓGICA DO PISCA-PISCA ---
-  // Verifica se já deu o tempo de inverter o estado do alerta
   if (millis() - tempoPiscaAlerta >= INTERVALO_PISCA) {
-    alertaVisivel = !alertaVisivel; // Inverte o estado (true -> false, false -> true)
-    tempoPiscaAlerta = millis();    // Reseta o timer do pisca
+    alertaVisivel = !alertaVisivel;
+    tempoPiscaAlerta = millis();
   }
-
-  // Ponteiro que decide qual desenho de alerta usar: o símbolo ou tudo apagado
   const byte* simboloAlertaAtual;
   if (alertaVisivel) {
     simboloAlertaAtual = alertSymbol;
@@ -234,15 +259,11 @@ void semaforo_loop() {
     simboloAlertaAtual = off;
   }
   
-  // Lógica principal do semáforo (sem alteração)
   definirPlanoDeAcao();
   executarCicloDeTempo();
 
-  // Desenha o modo atual, agora usando o símbolo de alerta que pisca
   switch (modoAtual) {
     case 0:  exibirPadraoContinuo(off, off, off); break;
-    
-    // CASOS DE ALERTA QUE AGORA PISCAM
     case 1:  exibirPadraoContinuo(off, simboloAlertaAtual, off); break;
     case 2:  exibirPadraoContinuo(arrowUp, simboloAlertaAtual, off); break;
     case 3:  exibirPadraoContinuo(arrowRight, simboloAlertaAtual, off); break;
@@ -250,12 +271,9 @@ void semaforo_loop() {
     case 5:  exibirPadraoContinuo(off, simboloAlertaAtual, arrowUp); break;
     case 6:  exibirPadraoContinuo(off, simboloAlertaAtual, arrowLeft); break;
     case 7:  exibirPadraoContinuo(off, simboloAlertaAtual, arrowRight); break;
-    
-    // CASOS NORMAIS (NÃO PISCAM)
     case 8:  exibirPadraoContinuo(all, off, off); break;
     case 9:  exibirPadraoContinuo(off, all, off); break;
     case 10: exibirPadraoContinuo(off, off, all); break;
-    
     default: exibirPadraoContinuo(off, off, off); break;
   }
 }
