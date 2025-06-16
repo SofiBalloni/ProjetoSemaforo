@@ -7,32 +7,31 @@
 #define USAR_SEMAFORO
 
 // ================== NOVOS PARÂMETROS DE CONTROLE ==================
-// --- NOVO: CONTROLE DE SENTIDO DA VIA ---
+// --- CONTROLE DE SENTIDO DA VIA ---
 int sentidoDaVia = 1; // 1: S->N, L->O; 2: N->S, L->O; 3: S->N, O->L; 4: N->S, O->L
 
-// Simulação dos dados de alagamento
-bool alagamentoNorte = true;
+// --- DADOS DE ALAGAMENTO (AGORA CONTROLADOS VIA SERIAL) ---
+// Valores iniciais são 'false'. Serão atualizados pela comunicação.
+bool alagamentoNorte = false;
 bool alagamentoSul = false;
 bool alagamentoLeste = false;
 bool alagamentoOeste = false;
 bool alagamentoLocal = false;
 
-// Identifica o plano de ação do semáforo
+// --- NOVAS VARIÁVEIS PARA COMUNICAÇÃO SERIAL E SINCRONIZAÇÃO ---
+String dadosRecebidos = "";
+bool novoComandoPendente = false;
+bool cicloFinalizado = true; // Começa como true para aceitar o primeiro comando
+
+// O resto dos seus parâmetros permanecem iguais
 enum PlanoDeAcao { NORMAL, REDIRECIONAR_ESQUERDA, REDIRECIONAR_DIREITA, PISTA_LIVRE, PISTA_BLOQUEADA };
 PlanoDeAcao planoAtual = NORMAL;
-
-// Estados para o ciclo de tempo (Verde, Amarelo, Vermelho)
 enum EstadoCiclo { CICLO_VERDE, CICLO_AMARELO, CICLO_VERMELHO };
 EstadoCiclo estadoCicloAtual = CICLO_VERDE;
-
-// Controle de tempo para o ciclo (em milissegundos)
 unsigned long tempoTrocaEstado = 0;
 const long TEMPO_VERDE = 15000;
 const long TEMPO_AMARELO = 5000;
 const long TEMPO_VERMELHO = 20000;
-// ===================================================================
-
-// Pinos e Variáveis
 Adafruit_AHTX0 aht;
 const int pinoSensorAgua = A0;
 int modoAtual = 10;
@@ -45,13 +44,9 @@ const long intervaloLeituraSensor = 5000;
 unsigned long tempoPiscaAlerta = 0;
 const long INTERVALO_PISCA = 600; 
 bool alertaVisivel = true;
-
-// Pinos: DIN, CLK, CS
 LedControl semaforo_lc1 = LedControl(4, 2, 3, 1);
 LedControl semaforo_lc2 = LedControl(7, 5, 6, 1);
 LedControl semaforo_lc3 = LedControl(10, 8, 9, 1);
-
-// Desenhos para a Matriz
 const byte off[8] =       {0,0,0,0,0,0,0,0};
 const byte all[8] =       {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 const byte arrowLeft[8] =  {0x08, 0x0C, 0x0E, 0xFF, 0xFF, 0x0E, 0x0C, 0x08};
@@ -59,7 +54,50 @@ const byte arrowRight[8] = {0x10, 0x30, 0x70, 0xFF, 0xFF, 0x70, 0x30, 0x10};
 const byte alertSymbol[8] = {0xFF, 0xE7, 0x7E, 0x66, 0x24, 0x24, 0x18, 0x18};
 const byte arrowUp[8] =    {0x18, 0x18, 0x18, 0x18, 0xFF, 0x7E, 0x3C, 0x18};
 
-// Função Principal de Setup
+// --- NOVAS FUNÇÕES PARA LER E PROCESSAR COMANDOS ---
+void processarComando() {
+  Serial.print("Processando novo comando: ");
+  Serial.println(dadosRecebidos);
+
+  // 1. Reseta todos os status de alagamento para false
+  alagamentoNorte = false;
+  alagamentoSul = false;
+  alagamentoLeste = false;
+  alagamentoOeste = false;
+  alagamentoLocal = false;
+
+  // 2. Ativa apenas os que foram mencionados no comando
+  if (dadosRecebidos.indexOf("FRONT") != -1) { alagamentoNorte = true; }
+  if (dadosRecebidos.indexOf("BACK") != -1) { alagamentoSul = true; }
+  if (dadosRecebidos.indexOf("RIGHT") != -1) { alagamentoLeste = true; }
+  if (dadosRecebidos.indexOf("LEFT") != -1) { alagamentoOeste = true; }
+  if (dadosRecebidos.indexOf("SELF") != -1) { alagamentoLocal = true; }
+
+  // 3. Limpa o buffer para o próximo comando
+  dadosRecebidos = "";
+}
+
+void verificarSerial() {
+  static bool emComando = false;
+  while (Serial.available() > 0) {
+    char charRecebido = Serial.read();
+    if (charRecebido == '!') {
+      if (emComando) { // Se já estávamos lendo e chegou o '!' final
+        novoComandoPendente = true; // Sinaliza que temos um comando pronto
+        emComando = false;
+      } else { // Se é o primeiro '!'
+        emComando = true;
+        dadosRecebidos = ""; // Limpa o buffer para o novo comando
+      }
+    } else {
+      if (emComando) {
+        dadosRecebidos += charRecebido; // Adiciona o caractere ao nosso buffer
+      }
+    }
+  }
+}
+
+// ================== FUNÇÃO DE SETUP PRINCIPAL ==================
 void setup() {
   Serial.begin(9600);
   #ifdef USAR_SENSOR
@@ -71,8 +109,17 @@ void setup() {
   tempoTrocaEstado = millis();
 }
 
-// Função Principal de Loop
+// ================== FUNÇÃO DE LOOP PRINCIPAL (MODIFICADA) ==================
 void loop() {
+  // Sempre verifica a porta serial por novos dados
+  verificarSerial();
+
+  // Só processa um novo comando se um ciclo completo já tiver terminado
+  if (novoComandoPendente && cicloFinalizado) {
+    processarComando();
+    novoComandoPendente = false; // Reseta a flag após o processamento
+  }
+  
   #ifdef USAR_SENSOR
     sensor_loop();
   #endif
@@ -91,6 +138,7 @@ void sensor_setup() {
   }
   Serial.println("Sensores prontos.");
 }
+
 void sensor_loop() {
   if (millis() - tempoLeituraSensor >= intervaloLeituraSensor) {
     tempoLeituraSensor = millis();
@@ -183,7 +231,7 @@ void definirPlanoDeAcao() {
   planoAtual = NORMAL;
 }
 
-// A função executarCicloDeTempo permanece a mesma
+// ================== CICLO DE TEMPO (MODIFICADO PARA SINCRONIZAÇÃO) ==================
 void executarCicloDeTempo() {
     unsigned long tempoAtual = millis();
     int casoVerde, casoAmarelo, casoVermelho;
@@ -208,6 +256,8 @@ void executarCicloDeTempo() {
 
     switch (estadoCicloAtual) {
         case CICLO_VERDE:
+            // No início de um novo ciclo, travamos a atualização de plano
+            cicloFinalizado = false; 
             modoAtual = casoVerde;
             if (tempoAtual - tempoTrocaEstado >= TEMPO_VERDE) { estadoCicloAtual = CICLO_AMARELO; tempoTrocaEstado = tempoAtual; }
             break;
@@ -217,24 +267,27 @@ void executarCicloDeTempo() {
             break;
         case CICLO_VERMELHO:
             modoAtual = casoVermelho;
-            if (tempoAtual - tempoTrocaEstado >= TEMPO_VERMELHO) { estadoCicloAtual = CICLO_VERDE; tempoTrocaEstado = tempoAtual; }
+            if (tempoAtual - tempoTrocaEstado >= TEMPO_VERMELHO) {
+                // Ao final do ciclo vermelho, liberamos a atualização de plano para a próxima volta
+                cicloFinalizado = true; 
+                estadoCicloAtual = CICLO_VERDE; 
+                tempoTrocaEstado = tempoAtual;
+            }
             break;
     }
 }
 
+// ================== SEMAFORO LOOP (MODIFICADO PARA SINCRONIZAÇÃO) ==================
 void semaforo_loop() {
-  // --- DISJUNTOR DE EMERGÊNCIA (NOVA LÓGICA DE PRIORIDADE MÁXIMA) ---
-  // Se a origem do tráfego ou o ponto local estão alagados, desliga tudo e para.
+  // A lógica de emergência foi movida para ter a maior prioridade
   bool origemAlagada = ((sentidoDaVia == 1 || sentidoDaVia == 3) && alagamentoSul) ||
                          ((sentidoDaVia == 2 || sentidoDaVia == 4) && alagamentoNorte);
-
   if (alagamentoLocal || origemAlagada) {
-    exibirPadraoContinuo(off, off, off); // Desliga todas as matrizes.
-    return; // Sai imediatamente da função, ignorando o resto da lógica.
+    exibirPadraoContinuo(off, off, off);
+    return;
   }
-
-  // --- LÓGICA NORMAL (SÓ EXECUTA SE A EMERGÊNCIA NÃO FOR ATIVADA) ---
-  // LÓGICA DO PISCA-PISCA
+  
+  // Lógica do Pisca-Pisca (sem alteração)
   if (millis() - tempoPiscaAlerta >= INTERVALO_PISCA) {
     alertaVisivel = !alertaVisivel;
     tempoPiscaAlerta = millis();
@@ -246,10 +299,11 @@ void semaforo_loop() {
     simboloAlertaAtual = off;
   }
   
+  // As duas funções principais que controlam o semáforo
   definirPlanoDeAcao();
   executarCicloDeTempo();
 
-  // Desenha o modo atual
+  // O switch para desenhar (sem alteração)
   switch (modoAtual) {
     case 0:  exibirPadraoContinuo(off, off, off); break;
     case 1:  exibirPadraoContinuo(off, simboloAlertaAtual, off); break;
