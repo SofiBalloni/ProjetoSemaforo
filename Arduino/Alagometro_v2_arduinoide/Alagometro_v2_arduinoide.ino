@@ -11,8 +11,8 @@
 int sentidoDaVia = 1; // 1: S->N, L->O; 2: N->S, L->O; 3: S->N, O->L; 4: N->S, O->L
 
 // Simulação dos dados de alagamento
-bool alagamentoNorte = false;
-bool alagamentoSul = true;
+bool alagamentoNorte = true;
+bool alagamentoSul = false;
 bool alagamentoLeste = false;
 bool alagamentoOeste = false;
 bool alagamentoLocal = false;
@@ -133,79 +133,55 @@ void semaforo_setup() {
 
 // ================== LÓGICA INTELIGENTE DO SEMÁFORO (VERSÃO FINAL CORRIGIDA) ==================
 void definirPlanoDeAcao() {
-  // PRIORIDADE 1: VERIFICA BLOQUEIOS TOTAIS QUE IMPEDEM QUALQUER FLUXO
-  if (alagamentoLocal || (alagamentoNorte && alagamentoSul)) {
+  // A verificação de alagamento na origem/local foi movida para semaforo_loop() como prioridade máxima.
+
+  // PRIORIDADE 1: VERIFICA SE A VIA INTEIRA ESTÁ BLOQUEADA
+  if (alagamentoNorte && alagamentoSul) {
     planoAtual = PISTA_BLOQUEADA;
     return;
   }
 
-  // PRIORIDADE 2: ANALISA O FLUXO DA VIA PRINCIPAL E REDIRECIONAMENTOS VÁLIDOS
+  // PRIORIDADE 2: ANALISA O FLUXO DA VIA PRINCIPAL E POSSÍVEIS REDIRECIONAMENTOS
   switch (sentidoDaVia) {
-    
     case 1: // Via Principal: Sul -> Norte / Cruzamento: Leste -> Oeste
-      // Se o caminho à frente (Norte) está bloqueado, só podemos virar à ESQUERDA para entrar no fluxo L->O.
       if (alagamentoNorte) {
-        // A via de destino (Oeste) está livre?
-        if (!alagamentoOeste) {
-          planoAtual = REDIRECIONAR_ESQUERDA;
-        } else { // Se não há para onde ir...
-          planoAtual = PISTA_BLOQUEADA;
-        }
-        return; // Decisão tomada.
+        if (!alagamentoOeste) { planoAtual = REDIRECIONAR_ESQUERDA; } 
+        else { planoAtual = PISTA_BLOQUEADA; }
+        return;
       }
       break;
-
     case 2: // Via Principal: Norte -> Sul / Cruzamento: Leste -> Oeste
-      // Se o caminho à frente (Sul) está bloqueado, só podemos virar à DIREITA para entrar no fluxo L->O.
       if (alagamentoSul) {
-        // A via de destino (Oeste) está livre?
-        if (!alagamentoOeste) {
-          planoAtual = REDIRECIONAR_DIREITA;
-        } else {
-          planoAtual = PISTA_BLOQUEADA;
-        }
-        return; // Decisão tomada.
+        if (!alagamentoOeste) { planoAtual = REDIRECIONAR_DIREITA; } 
+        else { planoAtual = PISTA_BLOQUEADA; }
+        return;
       }
       break;
-
     case 3: // Via Principal: Sul -> Norte / Cruzamento: Oeste -> Leste
-      // Se o caminho à frente (Norte) está bloqueado, só podemos virar à DIREITA para entrar no fluxo O->L.
       if (alagamentoNorte) {
-        // A via de destino (Leste) está livre?
-        if (!alagamentoLeste) {
-          planoAtual = REDIRECIONAR_DIREITA;
-        } else {
-          planoAtual = PISTA_BLOQUEADA;
-        }
-        return; // Decisão tomada.
+        if (!alagamentoLeste) { planoAtual = REDIRECIONAR_DIREITA; } 
+        else { planoAtual = PISTA_BLOQUEADA; }
+        return;
       }
       break;
-
     case 4: // Via Principal: Norte -> Sul / Cruzamento: Oeste -> Leste
-      // Se o caminho à frente (Sul) está bloqueado, só podemos virar à ESQUERDA para entrar no fluxo O->L.
       if (alagamentoSul) {
-        // A via de destino (Leste) está livre?
-        if (!alagamentoLeste) {
-          planoAtual = REDIRECIONAR_ESQUERDA;
-        } else {
-          planoAtual = PISTA_BLOQUEADA;
-        }
-        return; // Decisão tomada.
+        if (!alagamentoLeste) { planoAtual = REDIRECIONAR_ESQUERDA; } 
+        else { planoAtual = PISTA_BLOQUEADA; }
+        return;
       }
       break;
   }
 
-  // PRIORIDADE 3: SE A VIA PRINCIPAL ESTÁ LIVRE, VERIFICA A TRANSVERSAL
-  // Se a via transversal inteira está bloqueada, temos preferência.
+  // PRIORIDADE 3: VERIFICA A VIA TRANSVERSAL
   if (alagamentoLeste && alagamentoOeste) {
     planoAtual = PISTA_LIVRE;
     return;
   }
 
-  // PRIORIDADE 4: SE NADA DISSO OCORREU, OPERAÇÃO NORMAL
+  // PRIORIDADE 4: OPERAÇÃO NORMAL
   planoAtual = NORMAL;
 }
-
 
 // A função executarCicloDeTempo permanece a mesma
 void executarCicloDeTempo() {
@@ -246,8 +222,19 @@ void executarCicloDeTempo() {
     }
 }
 
-// A função semaforo_loop permanece a mesma
 void semaforo_loop() {
+  // --- DISJUNTOR DE EMERGÊNCIA (NOVA LÓGICA DE PRIORIDADE MÁXIMA) ---
+  // Se a origem do tráfego ou o ponto local estão alagados, desliga tudo e para.
+  bool origemAlagada = ((sentidoDaVia == 1 || sentidoDaVia == 3) && alagamentoSul) ||
+                         ((sentidoDaVia == 2 || sentidoDaVia == 4) && alagamentoNorte);
+
+  if (alagamentoLocal || origemAlagada) {
+    exibirPadraoContinuo(off, off, off); // Desliga todas as matrizes.
+    return; // Sai imediatamente da função, ignorando o resto da lógica.
+  }
+
+  // --- LÓGICA NORMAL (SÓ EXECUTA SE A EMERGÊNCIA NÃO FOR ATIVADA) ---
+  // LÓGICA DO PISCA-PISCA
   if (millis() - tempoPiscaAlerta >= INTERVALO_PISCA) {
     alertaVisivel = !alertaVisivel;
     tempoPiscaAlerta = millis();
@@ -262,6 +249,7 @@ void semaforo_loop() {
   definirPlanoDeAcao();
   executarCicloDeTempo();
 
+  // Desenha o modo atual
   switch (modoAtual) {
     case 0:  exibirPadraoContinuo(off, off, off); break;
     case 1:  exibirPadraoContinuo(off, simboloAlertaAtual, off); break;
