@@ -49,6 +49,9 @@ float temperatura = 0.0;
 float umidade = 0.0;
 unsigned long tempoLeituraSensor = 0;
 const long intervaloLeituraSensor = 5000;
+unsigned long tempoPiscaAlerta = 0;
+const long INTERVALO_PISCA = 600; 
+bool alertaVisivel = true;
 
 // Pinos: DIN, CLK, CS
 LedControl semaforo_lc1 = LedControl(4, 2, 3, 1);
@@ -108,7 +111,7 @@ void sensor_loop() {
     float arrayAlagometro[4] = {id, chovendo, temperatura, umidade};
     Serial.print("Dados - Molhado: "); Serial.print(chovendo);
     Serial.print(", Umidade: "); Serial.print(umidade);
-    Serial.print(", Temperatura: "); Serial.print(temperatura); Serial.println(".")
+    Serial.print(", Temperatura: "); Serial.print(temperatura); Serial.println(".");
   }
 }
 
@@ -216,21 +219,43 @@ void executarCicloDeTempo() {
 }
 
 void semaforo_loop() {
+  // --- LÓGICA DO PISCA-PISCA ---
+  // Verifica se já deu o tempo de inverter o estado do alerta
+  if (millis() - tempoPiscaAlerta >= INTERVALO_PISCA) {
+    alertaVisivel = !alertaVisivel; // Inverte o estado (true -> false, false -> true)
+    tempoPiscaAlerta = millis();    // Reseta o timer do pisca
+  }
+
+  // Ponteiro que decide qual desenho de alerta usar: o símbolo ou tudo apagado
+  const byte* simboloAlertaAtual;
+  if (alertaVisivel) {
+    simboloAlertaAtual = alertSymbol;
+  } else {
+    simboloAlertaAtual = off;
+  }
+  
+  // Lógica principal do semáforo (sem alteração)
   definirPlanoDeAcao();
   executarCicloDeTempo();
 
+  // Desenha o modo atual, agora usando o símbolo de alerta que pisca
   switch (modoAtual) {
     case 0:  exibirPadraoContinuo(off, off, off); break;
-    case 1:  exibirPadraoContinuo(off, alertSymbol, off); break;
-    case 2:  exibirPadraoContinuo(arrowUp, alertSymbol, off); break;
-    case 3:  exibirPadraoContinuo(arrowRight, alertSymbol, off); break;
-    case 4:  exibirPadraoContinuo(arrowLeft, alertSymbol, off); break;
-    case 5:  exibirPadraoContinuo(off, alertSymbol, arrowUp); break;
-    case 6:  exibirPadraoContinuo(off, alertSymbol, arrowLeft); break;
-    case 7:  exibirPadraoContinuo(off, alertSymbol, arrowRight); break;
+    
+    // CASOS DE ALERTA QUE AGORA PISCAM
+    case 1:  exibirPadraoContinuo(off, simboloAlertaAtual, off); break;
+    case 2:  exibirPadraoContinuo(arrowUp, simboloAlertaAtual, off); break;
+    case 3:  exibirPadraoContinuo(arrowRight, simboloAlertaAtual, off); break;
+    case 4:  exibirPadraoContinuo(arrowLeft, simboloAlertaAtual, off); break;
+    case 5:  exibirPadraoContinuo(off, simboloAlertaAtual, arrowUp); break;
+    case 6:  exibirPadraoContinuo(off, simboloAlertaAtual, arrowLeft); break;
+    case 7:  exibirPadraoContinuo(off, simboloAlertaAtual, arrowRight); break;
+    
+    // CASOS NORMAIS (NÃO PISCAM)
     case 8:  exibirPadraoContinuo(all, off, off); break;
     case 9:  exibirPadraoContinuo(off, all, off); break;
     case 10: exibirPadraoContinuo(off, off, all); break;
+    
     default: exibirPadraoContinuo(off, off, off); break;
   }
 }
